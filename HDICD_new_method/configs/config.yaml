@@ -1,9 +1,12 @@
 # Configuration for HDICD New Method
 dataset:
-  name: "CIFAR100"
-  data_path: "./data"
+  name: "domainnet"
+  data_path: "./data/domainnet"
+  source_domain: "real"
+  target_domain: "sketch"
   batch_size: 128
-  num_classes: 100
+  num_classes: 345
+  old_class_ratio: 0.5
 
 model:
   arch: "vit_base"

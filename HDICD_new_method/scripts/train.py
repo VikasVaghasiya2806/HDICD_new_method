@@ -22,19 +22,37 @@ def set_seed(seed):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
+def hungarian_match(preds, labels):
+    import numpy as np
+    from scipy.optimize import linear_sum_assignment
+    if len(preds) == 0: return np.array([])
+    num_classes = max(preds.max(), labels.max()) + 1
+    cost_matrix = np.zeros((num_classes, num_classes), dtype=np.int32)
+    for i in range(len(preds)):
+        cost_matrix[preds[i], labels[i]] += 1
+    row_ind, col_ind = linear_sum_assignment(cost_matrix.max() - cost_matrix)
+    mapping = {row: col for row, col in zip(row_ind, col_ind)}
+    return np.array([mapping.get(p, p) for p in preds])
+
 def evaluate(model, dataloader, device):
     """Evaluates the model and returns accuracy."""
     model.eval()
-    correct = 0
-    total = 0
+    all_preds = []
+    all_labels = []
     with torch.no_grad():
         for images, labels in dataloader:
             images, labels = images.to(device), labels.to(device)
             _, _, logits = model(images)
             preds = logits.argmax(dim=1)
-            correct += (preds == labels).sum().item()
-            total += labels.size(0)
-    return 100.0 * correct / total
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            
+    all_preds = np.array(all_preds)
+    all_labels = np.array(all_labels)
+    if len(all_labels) == 0: return 0.0
+    matched_preds = hungarian_match(all_preds, all_labels)
+    acc = (matched_preds == all_labels).mean() * 100.0
+    return acc
 
 def main():
     parser = argparse.ArgumentParser()
@@ -56,12 +74,27 @@ def main():
     # Load Data
     train_transform = get_train_augmentations()
     test_transform = get_test_augmentations()
-    # Using CIFAR100 logic for testing script
-    train_loader, test_loader = get_cifar100_dataloaders(
-        root=config['dataset']['data_path'],
-        batch_size=config['dataset']['batch_size'],
-        train_transform=train_transform, test_transform=test_transform
-    )
+    
+    if config['dataset']['name'].lower() == 'domainnet':
+        from datasets.domainnet_loader import get_domainnet_dataloaders
+        train_loader, test_loader, num_classes, num_old_classes = get_domainnet_dataloaders(
+            root=config['dataset']['data_path'],
+            source_domain=config['dataset'].get('source_domain', 'real'),
+            target_domain=config['dataset'].get('target_domain', 'sketch'),
+            batch_size=config['dataset']['batch_size'],
+            train_transform=train_transform,
+            test_transform=test_transform,
+            old_class_ratio=config['dataset'].get('old_class_ratio', 0.5)
+        )
+        config['dataset']['num_classes'] = num_classes
+        config['dataset']['num_old_classes'] = num_old_classes
+    else:
+        # Using CIFAR100 logic for testing script
+        train_loader, test_loader = get_cifar100_dataloaders(
+            root=config['dataset']['data_path'],
+            batch_size=config['dataset']['batch_size'],
+            train_transform=train_transform, test_transform=test_transform
+        )
 
     # Initialize Model
     model = HDICDModel(
