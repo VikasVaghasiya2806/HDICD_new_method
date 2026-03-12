@@ -11,7 +11,7 @@ def hyperbolic_similarity_matrix(features, c, alpha_d):
     # Compute hyperbolic pairwise distance matrix
     x_i = features.unsqueeze(1)  # (N, 1, D)
     x_j = features.unsqueeze(0)  # (1, N, D)
-    mobius_diff = mobius_add(-x_i, x_j, c)  # (N, N, D)
+    mobius_diff = mobius_add(-x_i, x_j, c=c)  # (N, N, D)
     dist_matrix = torch.norm(mobius_diff, dim=-1)  # (N, N)
     dist_sim = -2 / (c**0.5) * torch.atanh(torch.clamp(c**0.5 * dist_matrix, max=1 - 1e-5))
 

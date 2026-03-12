@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+import torch.nn as nn
 from tqdm import tqdm
 from augmentation.tangent_cutmix import tangent_cutmix
 from losses.busemann_loss import PenalizedBusemannLoss
@@ -40,15 +41,39 @@ class HDICDTrainer:
             with torch.no_grad():
                 self.prototypes.div_(self.prototypes.norm(dim=1, keepdim=True))
 
-    def train_epoch(self, dataloader, epoch, total_epochs, n_views=2, alpha_d=0.5):
+    def train_epoch(self, dataloader, epoch, total_epochs, n_views=2, alpha_d=0.5, debug=False, log_interval=10):
         self.model.train()
-        total_loss = 0
         
-        for batch_idx, (images, labels) in enumerate(tqdm(dataloader, desc=f"Epoch {epoch}")):
+        # Track multiple losses
+        metrics = {
+            'total_loss': 0.0,
+            'busemann_loss': 0.0,
+            'contrastive_loss': 0.0,
+            'outlier_loss': 0.0,
+            'classifier_loss': 0.0
+        }
+        
+        num_batches = len(dataloader)
+        if debug:
+            num_batches = min(num_batches, 10)
             
+        pbar = tqdm(total=num_batches, desc=f"Epoch {epoch}")
+        
+        for batch_idx, (images, labels) in enumerate(dataloader):
+            if debug and batch_idx >= 10:
+                break
+                
             # Since n_views=2 for Contrastive Learning View Generator, images might be a list of 2 tensors
             if isinstance(images, list):
-                images = torch.cat(images, dim=0).to(self.device)
+                views = images.copy()
+                view1, view2 = views[0], views[1]
+                
+                if epoch == 0 and batch_idx == 0:
+                    print(view1.shape)
+                    print(view2.shape)
+                    
+                # Feed both views to the model
+                images = torch.cat([view1, view2], dim=0).to(self.device)
                 labels = torch.cat([labels, labels], dim=0).to(self.device)
             else:
                 images = images.to(self.device)
@@ -66,8 +91,9 @@ class HDICDTrainer:
             else:
                 z_mix = f_mix
                 
-            z_mix = torch.tanh(z_mix)
-            z = torch.tanh(hyp_emb)
+            # Scale points to unit ball for Busemann norm calculations
+            z_mix = z_mix * torch.sqrt(self.model.curvature)
+            z = hyp_emb * torch.sqrt(self.model.curvature)
             
             batch_prototypes = self.prototypes[labels]
             
@@ -96,7 +122,32 @@ class HDICDTrainer:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            total_loss += loss.item()
+            
+            # Update metrics
+            metrics['total_loss'] += loss.item()
+            metrics['busemann_loss'] += loss_busemann.item()
+            metrics['contrastive_loss'] += loss_contrastive.item()
+            metrics['outlier_loss'] += loss_outlier.item()
+            metrics['classifier_loss'] += loss_classifier.item()
+            
+            with torch.no_grad():
+                self.model.curvature.clamp_(min=1e-4, max=10.0)
+            
+            # Update progress bar
+            pbar.update(1)
+            if (batch_idx + 1) % log_interval == 0:
+                pbar.set_postfix({
+                    'Loss': f"{loss.item():.4f}", 
+                    'Buse': f"{loss_busemann.item():.4f}",
+                    'Cont': f"{loss_contrastive.item():.4f}"
+                })
+                
+        pbar.close()
             
         self.scheduler.step()
-
+        
+        # Average metrics
+        for k in metrics.keys():
+            metrics[k] /= num_batches
+            
+        return metrics

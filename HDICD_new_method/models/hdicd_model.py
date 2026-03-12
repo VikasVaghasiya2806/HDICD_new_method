@@ -45,7 +45,7 @@ class HDICDModel(nn.Module):
         self.backbone = DINOBackbone(arch, patch_size)
         self.projection_head = DINOHead(in_dim=self.backbone.out_dim, out_dim=emb_dim, nlayers=3)
         self.curvature = nn.Parameter(torch.tensor(c, dtype=torch.float32), requires_grad=True)
-        self.to_poincare = ToPoincare(c=self.curvature, train_c=True, riemannian=True)
+        self.to_poincare = ToPoincare(c=self.curvature, train_c=False, riemannian=True)
         self.classifier = HyperbolicPrototypeClassifier(emb_dim=emb_dim, num_classes=num_classes, c=self.curvature)
         
     def forward(self, x):
