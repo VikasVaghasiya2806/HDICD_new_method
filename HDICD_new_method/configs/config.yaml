@@ -1,0 +1,28 @@
+# Configuration for HDICD New Method
+dataset:
+  name: "CIFAR100"
+  data_path: "./data"
+  batch_size: 128
+  num_classes: 100
+
+model:
+  arch: "vit_base"
+  patch_size: 16
+  emb_dim: 32
+  c: 0.05
+  do_hyperbolic: true
+
+training:
+  epochs: 50
+  lr: 0.01
+  weight_decay: 5e-5
+  momentum: 0.9
+  n_views: 2
+  alpha_d: 0.5
+  penalty_value: 0.75
+  proto_epochs: 1000
+  proto_lr: 0.1
+
+system:
+  device_id: 0
+  seed: 42
