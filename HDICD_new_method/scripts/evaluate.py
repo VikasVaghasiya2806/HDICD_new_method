@@ -58,7 +58,7 @@ def evaluate(model, dataloader, device, num_old_classes):
     acc_old = (matched_preds[old_mask] == all_labels[old_mask]).mean() * 100 if old_mask.sum() > 0 else 0
     acc_new = (matched_preds[new_mask] == all_labels[new_mask]).mean() * 100 if new_mask.sum() > 0 else 0
     
-    print("\nEvaluation Results")
+    print("Evaluation Results")
     print("------------------")
     print(f"All Accuracy : {acc_all:.2f}%")
     print(f"Old Accuracy : {acc_old:.2f}%")
@@ -66,7 +66,15 @@ def evaluate(model, dataloader, device, num_old_classes):
     print(f"NMI          : {nmi:.4f}")
     print(f"ARI          : {ari:.4f}\n")
     
-    return acc_all
+    return {
+        'acc_all': acc_all,
+        'acc_old': acc_old,
+        'acc_new': acc_new,
+        'nmi': nmi,
+        'ari': ari,
+        'preds': matched_preds,
+        'labels': all_labels
+    }
 
 def main():
     parser = argparse.ArgumentParser()
