@@ -118,6 +118,17 @@ def main():
             test_transform=get_test_augmentations(),
             old_class_ratio=old_class_ratio
         )
+    elif config['dataset']['name'].lower() == 'pacs':
+        from datasets.pacs_loader import get_pacs_dataloaders
+        _, test_loader, num_classes, num_old_classes = get_pacs_dataloaders(
+            root=config['dataset']['data_path'],
+            source_domains=config['dataset'].get('source_domains', ['photo', 'cartoon', 'art_painting']),
+            target_domain=config['dataset'].get('target_domain', 'sketch'),
+            batch_size=config['dataset']['batch_size'],
+            train_transform=get_test_augmentations(),
+            test_transform=get_test_augmentations(),
+            old_class_ratio=old_class_ratio
+        )
     else:
         test_transform = get_test_augmentations()
         _, test_loader = get_cifar100_dataloaders(

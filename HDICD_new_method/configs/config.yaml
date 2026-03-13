@@ -1,11 +1,11 @@
 # Configuration for HDICD New Method
 dataset:
-  name: "domainnet"
-  data_path: "./data/domainnet"
-  source_domain: "real"
-  target_domain: "sketch"
+  name: "PACS"
+  data_path: "./data/PACS"
   batch_size: 128
-  num_classes: 345
+  num_classes: 7
+  source_domains: ["photo", "cartoon", "art_painting"]
+  target_domain: "sketch"
   old_class_ratio: 0.5
 
 model:
