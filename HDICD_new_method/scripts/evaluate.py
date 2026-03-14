@@ -99,7 +99,7 @@ def main():
     
     if args.checkpoint and os.path.exists(args.checkpoint):
         print(f"Loading checkpoint from {args.checkpoint}...")
-        checkpoint = torch.load(args.checkpoint, map_location=device)
+        checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
         model.load_state_dict(checkpoint['model'])
     else:
         print("Warning: No checkpoint provided or found. Evaluating with initialized weights.")
@@ -124,6 +124,17 @@ def main():
             root=config['dataset']['data_path'],
             source_domains=config['dataset'].get('source_domains', ['photo', 'cartoon', 'art_painting']),
             target_domain=config['dataset'].get('target_domain', 'sketch'),
+            batch_size=config['dataset']['batch_size'],
+            train_transform=get_test_augmentations(),
+            test_transform=get_test_augmentations(),
+            old_class_ratio=old_class_ratio
+        )
+    elif config['dataset']['name'].lower() == 'officehome':
+        from datasets.office_home_loader import get_office_home_dataloaders
+        _, test_loader, num_classes, num_old_classes = get_office_home_dataloaders(
+            root=config['dataset']['data_path'],
+            source_domains=config['dataset'].get('source_domains', ['Art', 'Clipart', 'Product']),
+            target_domain=config['dataset'].get('target_domain', 'Real World'),
             batch_size=config['dataset']['batch_size'],
             train_transform=get_test_augmentations(),
             test_transform=get_test_augmentations(),

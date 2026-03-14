@@ -37,7 +37,7 @@ def main():
 
     if os.path.exists(args.checkpoint):
         print(f"Loading checkpoint from {args.checkpoint}...")
-        checkpoint = torch.load(args.checkpoint, map_location=device)
+        checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
         model.load_state_dict(checkpoint['model'])
     else:
         print(f"Error: Checkpoint {args.checkpoint} not found!")

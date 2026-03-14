@@ -14,6 +14,7 @@ class HDICDTrainer:
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.device = device
+        self.num_classes = num_classes
         
         # Losses
         self.busemann_criterion = PenalizedBusemannLoss(phi=penalty_value).to(device)
@@ -90,31 +91,35 @@ class HDICDTrainer:
                 z_mix = self.model.to_poincare(f_mix)
             else:
                 z_mix = f_mix
-                
+            
+            # For Busemann Loss: only use non-doubled labels (first half)
+            # because we only need one prototype per sample, not per view
+            base_labels = labels[:labels.size(0) // n_views] if labels.size(0) > images.size(0) // 2 else labels
+            batch_prototypes = self.prototypes[base_labels % self.prototypes.size(0)]
+            
             # Scale points to unit ball for Busemann norm calculations
-            z_mix = z_mix * torch.sqrt(self.model.curvature)
-            z = hyp_emb * torch.sqrt(self.model.curvature)
+            c_val = self.model.curvature.abs().clamp(min=1e-4, max=10.0)
+            c_sqrt = torch.sqrt(c_val)
+            z_mix_scaled = z_mix * c_sqrt
+            z_scaled = hyp_emb * c_sqrt
             
-            batch_prototypes = self.prototypes[labels]
-            
-            # 2. Compute Losses
             # Busemann loss (prototypes vs embeddings)
-            loss_busemann = self.busemann_criterion(z, batch_prototypes)
+            loss_busemann = self.busemann_criterion(z_scaled[:base_labels.size(0)], batch_prototypes)
             
-            # InfoNCE contrastive loss
-            loss_contrastive = hyperbolic_info_nce_loss(hyp_emb, n_views=n_views, c=self.model.curvature, alpha_d=alpha_d)
+            # InfoNCE contrastive loss (uses all views)
+            loss_contrastive = hyperbolic_info_nce_loss(hyp_emb, n_views=n_views, c=c_val, alpha_d=alpha_d)
             
             # Adaptive Outlier Repulsion
             if epoch == 0 and batch_idx == 0:
                 from hyperbolic.poincare_ops import dist_matrix
-                dists = dist_matrix(z_mix, self.prototypes, c=self.model.curvature)
+                dists = dist_matrix(z_mix_scaled, self.prototypes, c=c_val)
                 mins = dists.min(dim=1).values
                 self.repel_margin = torch.quantile(mins, 0.8).detach()
                 
-            loss_outlier = self.outlier_criterion(z_mix, self.prototypes, self.repel_margin)
+            loss_outlier = self.outlier_criterion(z_mix_scaled, self.prototypes, self.repel_margin)
             
-            # Prototype Classifier CrossEntropy
-            loss_classifier = self.classifier_criterion(logits, labels)
+            # Prototype Classifier CrossEntropy (use base labels)
+            loss_classifier = self.classifier_criterion(logits[:batch_prototypes.size(0)], base_labels % self.num_classes)
             
             # Total Loss
             loss = 1.0 * loss_busemann + 1.0 * loss_contrastive + 1.0 * loss_outlier + 1.0 * loss_classifier

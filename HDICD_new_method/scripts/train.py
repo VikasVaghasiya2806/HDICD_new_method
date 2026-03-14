@@ -34,13 +34,15 @@ def hungarian_match(preds, labels):
     mapping = {row: col for row, col in zip(row_ind, col_ind)}
     return np.array([mapping.get(p, p) for p in preds])
 
-def evaluate(model, dataloader, device):
+def evaluate(model, dataloader, device, num_old_classes):
     """Evaluates the model and returns accuracy."""
     model.eval()
     all_preds = []
     all_labels = []
     with torch.no_grad():
         for images, labels in dataloader:
+            if isinstance(images, list):
+                images = images[0]  # Use first view for evaluation
             images, labels = images.to(device), labels.to(device)
             _, _, logits = model(images)
             preds = logits.argmax(dim=1)
@@ -52,7 +54,7 @@ def evaluate(model, dataloader, device):
     if len(all_labels) == 0: return 0.0
     matched_preds = hungarian_match(all_preds, all_labels)
     acc = (matched_preds == all_labels).mean() * 100.0
-    return acc
+    return float(acc)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -101,6 +103,19 @@ def main():
         )
         config['dataset']['num_classes'] = num_classes
         config['dataset']['num_old_classes'] = num_old_classes
+    elif config['dataset']['name'].lower() == 'officehome':
+        from datasets.office_home_loader import get_office_home_dataloaders
+        train_loader, test_loader, num_classes, num_old_classes = get_office_home_dataloaders(
+            root=config['dataset']['data_path'],
+            source_domains=config['dataset'].get('source_domains', ['Art', 'Clipart', 'Product']),
+            target_domain=config['dataset'].get('target_domain', 'Real World'),
+            batch_size=config['dataset']['batch_size'],
+            train_transform=train_transform,
+            test_transform=test_transform,
+            old_class_ratio=config['dataset'].get('old_class_ratio', 0.5)
+        )
+        config['dataset']['num_classes'] = num_classes
+        config['dataset']['num_old_classes'] = num_old_classes
     else:
         # Using CIFAR100 logic for testing script
         train_loader, test_loader = get_cifar100_dataloaders(
@@ -140,7 +155,7 @@ def main():
     # Resume functionality
     if args.resume and os.path.exists(args.resume):
         print(f"Loading checkpoint from {args.resume}...")
-        checkpoint = torch.load(args.resume, map_location=device)
+        checkpoint = torch.load(args.resume, map_location=device, weights_only=False)
         model.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         scheduler.load_state_dict(checkpoint['scheduler'])
@@ -181,16 +196,17 @@ def main():
         print(f"Outlier Loss: {metrics['outlier_loss']:.2f}")
         print(f"Classifier Loss: {metrics['classifier_loss']:.2f}")
         
-        # Save metrics to JSON
+        # Save metrics to JSON (ensure values are JSON serializable floats)
         metrics['epoch'] = epoch
+        safe_metrics = {k: round(float(v), 6) if isinstance(v, (int, float, np.floating)) else v for k, v in metrics.items()}
         with open(log_file, 'r') as f:
             logs = json.load(f)
-        logs.append(metrics)
+        logs.append(safe_metrics)
         with open(log_file, 'w') as f:
             json.dump(logs, f, indent=4)
             
         # Evaluation for Best Model
-        val_acc = evaluate(model, test_loader, device)
+        val_acc = evaluate(model, test_loader, device, num_old_classes)
         print(f"Validation Accuracy: {val_acc:.2f}%\n")
         
         # Checkpointing
