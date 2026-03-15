@@ -16,16 +16,26 @@ HDICD_new_method/
 └── training/          # Trainer and optimizer setups
 ```
 
-## Setup & Running Experiments
+### Dataset Manual Setup
 
-### Requirements
-- PyTorch >= 1.13.0
-- torchvision >= 0.14.0
-- pyyaml
-- tqdm
-- scipy
-- numpy
+#### Office-Home (Manual)
+Run these commands to setup Office-Home in the correct directory:
+```bash
+mkdir -p ./data/office_home
+wget -O ./data/office_home/OfficeHome.zip "https://huggingface.co/datasets/Kellter/OfficeHomeDataset/resolve/main/Office-Home.zip?download=true"
+unzip ./data/office_home/OfficeHome.zip -d ./data/office_home
+# Move folders to root if they are nested
+mv ./data/office_home/OfficeHome/* ./data/office_home/ 2>/dev/null
+```
 
+#### PACS (Manual)
+Run these commands to setup PACS:
+```bash
+mkdir -p ./data/PACS
+git clone --depth 1 https://github.com/MachineLearning2020/Homework3-PACS.git ./data/PACS/temp
+mv ./data/PACS/temp/PACS/* ./data/PACS/
+rm -rf ./data/PACS/temp
+```
 ### Training
 To train the model on CIFAR-100, you can run:
 ```bash
