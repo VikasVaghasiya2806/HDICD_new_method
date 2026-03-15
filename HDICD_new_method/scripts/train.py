@@ -116,6 +116,17 @@ def main():
         )
         config['dataset']['num_classes'] = num_classes
         config['dataset']['num_old_classes'] = num_old_classes
+    elif config['dataset']['name'].lower() in ('cub200', 'cub'):
+        from datasets.cub_loader import get_cub_dataloaders
+        train_loader, test_loader, num_classes, num_old_classes = get_cub_dataloaders(
+            root=config['dataset']['data_path'],
+            batch_size=config['dataset']['batch_size'],
+            train_transform=train_transform,
+            test_transform=test_transform,
+            old_class_ratio=config['dataset'].get('old_class_ratio', 0.5)
+        )
+        config['dataset']['num_classes'] = num_classes
+        config['dataset']['num_old_classes'] = num_old_classes
     else:
         # Using CIFAR100 logic for testing script
         train_loader, test_loader = get_cifar100_dataloaders(

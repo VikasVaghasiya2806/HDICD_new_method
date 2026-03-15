@@ -140,6 +140,15 @@ def main():
             test_transform=get_test_augmentations(),
             old_class_ratio=old_class_ratio
         )
+    elif config['dataset']['name'].lower() in ('cub200', 'cub'):
+        from datasets.cub_loader import get_cub_dataloaders
+        _, test_loader, num_classes, num_old_classes = get_cub_dataloaders(
+            root=config['dataset']['data_path'],
+            batch_size=config['dataset']['batch_size'],
+            train_transform=get_test_augmentations(),
+            test_transform=get_test_augmentations(),
+            old_class_ratio=old_class_ratio
+        )
     else:
         test_transform = get_test_augmentations()
         _, test_loader = get_cifar100_dataloaders(

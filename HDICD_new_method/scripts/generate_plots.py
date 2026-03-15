@@ -47,7 +47,8 @@ def main():
     num_classes = config['dataset'].get('num_classes', 100)
     old_class_ratio = config['dataset'].get('old_class_ratio', 0.5)
 
-    if config['dataset']['name'].lower() == 'domainnet':
+    dataset_name = config['dataset']['name'].lower()
+    if dataset_name == 'domainnet':
         from datasets.domainnet_loader import get_domainnet_dataloaders
         _, test_loader, num_classes, num_old_classes = get_domainnet_dataloaders(
             root=config['dataset']['data_path'],
@@ -57,7 +58,40 @@ def main():
             train_transform=get_test_augmentations(),
             test_transform=get_test_augmentations(),
             old_class_ratio=old_class_ratio,
-            download=False # Assuming already downloaded
+            download=False
+        )
+    elif dataset_name == 'officehome':
+        from datasets.office_home_loader import get_office_home_dataloaders
+        _, test_loader, num_classes, num_old_classes = get_office_home_dataloaders(
+            root=config['dataset']['data_path'],
+            source_domains=config['dataset'].get('source_domains', ['Art', 'Clipart', 'Product']),
+            target_domain=config['dataset'].get('target_domain', 'Real_World'),
+            batch_size=config['dataset']['batch_size'],
+            train_transform=get_test_augmentations(),
+            test_transform=get_test_augmentations(),
+            old_class_ratio=old_class_ratio,
+            download=False
+        )
+    elif dataset_name == 'pacs':
+        from datasets.pacs_loader import get_pacs_dataloaders
+        _, test_loader, num_classes, num_old_classes = get_pacs_dataloaders(
+            root=config['dataset']['data_path'],
+            source_domain=config['dataset'].get('source_domain', 'photo'),
+            target_domain=config['dataset'].get('target_domain', 'art_painting'),
+            batch_size=config['dataset']['batch_size'],
+            train_transform=get_test_augmentations(),
+            test_transform=get_test_augmentations(),
+            old_class_ratio=old_class_ratio,
+            download=False
+        )
+    elif dataset_name in ('cub200', 'cub'):
+        from datasets.cub_loader import get_cub_dataloaders
+        _, test_loader, num_classes, num_old_classes = get_cub_dataloaders(
+            root=config['dataset']['data_path'],
+            batch_size=config['dataset']['batch_size'],
+            train_transform=get_test_augmentations(),
+            test_transform=get_test_augmentations(),
+            old_class_ratio=old_class_ratio
         )
     else:
         test_transform = get_test_augmentations()
